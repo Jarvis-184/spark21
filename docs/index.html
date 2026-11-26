@@ -125,7 +125,7 @@ function award(){const h=haveB();for(const b of BADGES){if(!h[b[0]]&&b[3](S)){h[
 function renderChart(){const h=S.hist,svg=$('chart');if(h.length<2){svg.innerHTML='';return}const lo=Math.min(...h),hi=Math.max(...h),r=Math.max(hi-lo,1);const p=h.map((v,i)=>[i/(h.length-1)*290+5,80-(v-lo)/r*70]);svg.innerHTML='<polyline fill="none" stroke="#ff3d81" stroke-width="3" stroke-linejoin="round" points="'+p.map(q=>q.join(',')).join(' ')+'"/>'+p.map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r="3" fill="#8a3dff"/>`).join('');$('chart-note').textContent='Low '+lo+' | high '+hi+' | now '+h[h.length-1]+' chips'}
 function spinKey(){return 'bj-spin-'+new Date().toISOString().slice(0,10)}
 function renderSpin(){const d=localStorage.getItem(spinKey());$('spin').disabled=!!d;if(d)$('spintxt').textContent="Today's spin: +"+d+' chips. Come back tomorrow.'}
-let wd=0;$('spin').onclick=()=>{if(localStorage.getItem(spinKey()))return;const pr=[25,50,100,150,250,500],i=rnd(6);wd+=1440+(360-(i*60+30));$('wheel').style.transform='rotate('+wd+'deg)';$('spin').disabled=true;tone(500,.6,'triangle',.06,0,500);setTimeout(()=>{S.chips+=pr[i];try{localStorage.setItem(spinKey(),pr[i])}catch(e){}hud();renderSpin();toast('Daily spin: +'+pr[i]+' chips')},2500)};
+let wd=0;$('spin').onclick=()=>{if(S.mode!=='practice'){toast('The daily spin gives chips in Practice mode');return}if(localStorage.getItem(spinKey()))return;const pr=[25,50,100,150,250,500],i=rnd(6);wd+=1440+(360-(i*60+30));$('wheel').style.transform='rotate('+wd+'deg)';$('spin').disabled=true;tone(500,.6,'triangle',.06,0,500);setTimeout(()=>{S.chips+=pr[i];try{localStorage.setItem(spinKey(),pr[i])}catch(e){}hud();renderSpin();toast('Daily spin: +'+pr[i]+' chips')},2500)};
 $('share').onclick=()=>{const t='Spark 21 blackjack: '+S.hands+' hands, '+S.wins+' wins, peak '+S.peak+' chips\n'+S.grid.join('');if(navigator.clipboard)navigator.clipboard.writeText(t).then(()=>toast('Copied to clipboard'),()=>toast(t));else toast(t)};
 // ---------- game flow ----------
 function setCtl(st){S.state=st;$('bet-ctl').style.display=st==='bet'?'':'none';$('play-ctl').style.display=st==='play'?'':'none'}
@@ -159,7 +159,7 @@ const EXP='https://explorer.solana.com/tx/';const CU='?cluster=custom&customUrl=
 S.mode='replay';S.data=null;S.ridx=0;
 const RMAP={BLACKJACK:'bj',WIN:'win',LOSE:'lose',PUSH:'push',BUST:'bust'};
 const CD=c=>({s:Math.floor(c/13),r:c%13});
-function setMode(m){X.feed=[];S.mode=m;S.state='bet';S.chips=1000;S.hands=0;S.wins=0;S.streak=0;S.best=0;S.peak=1000;S.grid=[];S.hist=[1000];S.player=[];S.dealer=[];S.ridx=0;$('hist').innerHTML='';render(false);$('msg').textContent='';
+function setMode(m){X.feed=[];S.ep=(S.ep||0)+1;rbusy=false;S.mode=m;S.state='bet';S.chips=1000;S.hands=0;S.wins=0;S.streak=0;S.best=0;S.peak=1000;S.grid=[];S.hist=[1000];S.player=[];S.dealer=[];S.ridx=0;$('hist').innerHTML='';render(false);$('msg').textContent='';
  $('t-replay').classList.toggle('on',m==='replay');$('t-practice').classList.toggle('on',m==='practice');$('bet-ctl').style.display=m==='practice'?'':'none';$('play-ctl').style.display='none';$('replay-ctl').style.display=m==='replay'?'':'none';
  $('src').textContent=m==='replay'?'real devnet hands (VRF)':'practice: local shuffle, not VRF';say(m==='replay'?'Watch real on-chain hands!':'Place your bet and I will deal!');hud();renderChart();renderFeed()}
 $('t-replay').onclick=()=>setMode('replay');$('t-practice').onclick=()=>setMode('practice');
@@ -168,13 +168,13 @@ $('r-next').onclick=()=>{const d=S.data;if(rbusy)return;if(!d||!d.hands.length){
  if(S.ridx>=d.hands.length){$('msg').textContent='End of the recording. Switch tabs to replay.';return}
  rbusy=true;const h=d.hands[S.ridx++];const acts=h.actions.map(a=>a[0]);S.doubled=acts.includes('double');S.bet=h.bet;
  S.player=h.player.slice(0,2).map(CD);S.dealer=h.dealer.slice(0,2).map(CD);$('msg').className='msg';$('msg').textContent='';
- const T=(f,ms)=>new Promise(r=>setTimeout(()=>{f();r()},ms));
+ const ep=S.ep;const T=(f,ms)=>new Promise(r=>setTimeout(()=>{if(ep===S.ep)f();r()},ms));
  (async()=>{sfx.deal();render(true);say('Dealing from VRF...');let pi=2;
   for(const a of acts.slice(1)){if(a==='hit'||a==='double'){await T(()=>{S.player.push(CD(h.player[pi]));pi++;sfx.deal();render(true);say(a==='double'?'Double down!':'Hit!')},650)}}
   await T(()=>{S.dealer=h.dealer.map(CD);render(false);sfx.deal()},700);
   await T(()=>{const link=EXP+h.actions[h.actions.length-1][1]+CU;S.chips=h.chipsAfter-h.gain;conclude(RMAP[h.result],h.gain,link);rbusy=false},500)})()};
 fetch('hands.json').then(r=>r.json()).then(j=>{S.data=j;$('proof').innerHTML='Program <code>'+j.program+'</code> on Solana devnet (<a target="_blank" rel="noopener" href="https://explorer.solana.com/address/'+j.program+'?cluster=devnet">explorer</a>).<br>Table account <code>'+j.table+'</code>, delegated to a MagicBlock Ephemeral Rollup.<br>'+j.note;if(j.hands.length)$('msg').textContent='Press play to replay '+j.hands.length+' real hands'}).catch(()=>{$('proof').textContent='hands.json not found.'});
 $('deal').onclick=startHand;$('hit').onclick=hit;$('stand').onclick=stand;$('dbl').onclick=dbl;
-document.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(S.state==='bet'&&(k==='d'||k==='enter'))startHand();else if(S.state==='play'){if(k==='h')hit();if(k==='s')stand();if(k==='x')dbl()}});
+document.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(S.mode!=='practice')return;if(S.state==='bet'&&(k==='d'||k==='enter'))startHand();else if(S.state==='play'){if(k==='h')hit();if(k==='s')stand();if(k==='x')dbl()}});
 S.deck=newDeck();setCtl('bet');hud();renderGoals();renderBadges();renderSpin();renderChart();setMode('replay');
 </script></body></html>
