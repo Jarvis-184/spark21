@@ -122,7 +122,7 @@ const BADGES=[['first','First win','Win a hand',s=>s.wins>=1],['bj','Natural','G
 function haveB(){try{return JSON.parse(localStorage.getItem('bj-badges'))||{}}catch(e){return{}}}
 function renderBadges(){const h=haveB();$('badges').innerHTML=BADGES.map(b=>`<div class="bdg ${h[b[0]]?'got':''}" title="${b[2]}"><b>${h[b[0]]?'★':'☆'}</b>${b[1]}</div>`).join('')}
 function award(){const h=haveB();for(const b of BADGES){if(!h[b[0]]&&b[3](S)){h[b[0]]=1;toast('Badge unlocked: '+b[1])}}try{localStorage.setItem('bj-badges',JSON.stringify(h))}catch(e){}renderBadges()}
-function renderChart(){const h=S.hist,svg=$('chart');if(h.length<2){svg.innerHTML='';return}const lo=Math.min(...h),hi=Math.max(...h),r=Math.max(hi-lo,1);const p=h.map((v,i)=>[i/(h.length-1)*290+5,80-(v-lo)/r*70]);svg.innerHTML='<polyline fill="none" stroke="#ff3d81" stroke-width="3" stroke-linejoin="round" points="'+p.map(q=>q.join(',')).join(' ')+'"/>'+p.map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r="3" fill="#8a3dff"/>`).join('');$('chart-note').textContent='Low '+lo+' | high '+hi+' | now '+h[h.length-1]+' chips'}
+function renderChart(){const h=S.hist,svg=$('chart');if(h.length<2){svg.innerHTML='';$('chart-note').textContent='Play hands to draw your chip line.';return}const lo=Math.min(...h),hi=Math.max(...h),r=Math.max(hi-lo,1);const p=h.map((v,i)=>[i/(h.length-1)*290+5,80-(v-lo)/r*70]);svg.innerHTML='<polyline fill="none" stroke="#ff3d81" stroke-width="3" stroke-linejoin="round" points="'+p.map(q=>q.join(',')).join(' ')+'"/>'+p.map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r="3" fill="#8a3dff"/>`).join('');$('chart-note').textContent='Low '+lo+' | high '+hi+' | now '+h[h.length-1]+' chips'}
 function spinKey(){return 'bj-spin-'+new Date().toISOString().slice(0,10)}
 function renderSpin(){const d=localStorage.getItem(spinKey());$('spin').disabled=!!d;if(d)$('spintxt').textContent="Today's spin: +"+d+' chips. Come back tomorrow.'}
 let wd=0;$('spin').onclick=()=>{if(S.mode!=='practice'){toast('The daily spin gives chips in Practice mode');return}if(localStorage.getItem(spinKey()))return;const pr=[25,50,100,150,250,500],i=rnd(6);wd+=1440+(360-(i*60+30));$('wheel').style.transform='rotate('+wd+'deg)';$('spin').disabled=true;tone(500,.6,'triangle',.06,0,500);setTimeout(()=>{S.chips+=pr[i];try{localStorage.setItem(spinKey(),pr[i])}catch(e){}hud();renderSpin();toast('Daily spin: +'+pr[i]+' chips')},2500)};
@@ -146,20 +146,20 @@ function conclude(res,gain,link){const pv=val(S.player),dv=val(S.dealer),mult=1+
  else if(res==='win'){lbl='WIN +'+(gain-S.bet)+(S.streak>0?'  (combo x'+mult.toFixed(1)+')':'');cls='win'}
  else if(res==='push'){lbl='Push, bet returned';cls='push'}
  else{lbl=(res==='bust'?'Bust! ':'Dealer wins. ')+'-'+S.bet;cls='loss'}
- const won=res==='bj'||res==='win';S.chips+=gain;S.hands++;S.g.hands++;
- if(won){S.wins++;S.g.wins++;S.streak++;S.best=Math.max(S.best||0,S.streak);if(S.doubled){S.g.dbl++;S.dblWin=true}if(res==='bj'){S.g.bj++;S.bjAny=true}}else if(res!=='push'){S.streak=0}
- S.xp+=won?25:10;S.peak=Math.max(S.peak,S.chips);S.grid.push(res==='bj'?'🟨':won?'🟩':res==='push'?'🟦':'🟥');if(S.grid.length>30)S.grid.shift();S.hist.push(S.chips);
+ const won=res==='bj'||res==='win';S.chips+=gain;S.hands++;if(S.mode==='practice')S.g.hands++;
+ if(won){S.wins++;if(S.mode==='practice')S.g.wins++;S.streak++;S.best=Math.max(S.best||0,S.streak);if(S.doubled&&S.mode==='practice'){S.g.dbl++;S.dblWin=true}if(res==='bj'&&S.mode==='practice'){S.g.bj++;S.bjAny=true}}else if(res!=='push'){S.streak=0}
+ if(S.mode==='practice')S.xp+=won?25:10;S.peak=Math.max(S.peak,S.chips);S.grid.push(res==='bj'?'🟨':won?'🟩':res==='push'?'🟦':'🟥');if(S.grid.length>30)S.grid.shift();S.hist.push(S.chips);
  m.className='msg pop '+cls;m.textContent=lbl;
  if(res==='bj'){sfx.bj();buzz([40,40,80]);fireworks();say('BLACKJACK! Fireworks!','wow')}else if(won){sfx.win();buzz(30);say(S.streak>=3?'Streak of '+S.streak+'! Keep going!':'Nice one!')}else if(res==='push'){sfx.push();say('A tie. Bet returned.')}else{sfx.loss();buzz(120);say(res==='bust'?'Oops, over 21. Next hand!':'Dealer got that one. Shake it off!','sad')}
  const tr=document.createElement('tr');tr.innerHTML=`<td>${S.hands}</td><td>${S.bet}</td><td>${pv}</td><td>${dv}</td><td class="${won?'w':res==='push'?'':'l'}">${res==='bj'?'BJ':res.toUpperCase()}</td><td>${link?'<a target="_blank" rel="noopener" href="'+link+'">view</a>':'-'}</td>`;$('hist').prepend(tr);while($('hist').children.length>8)$('hist').lastChild.remove();
- X.feed.push((won?'🟩 ':res==='push'?'🟦 ':'🟥 ')+'Hand '+S.hands+': you '+pv+' vs dealer '+dv+' ('+(res==='bj'?'blackjack':res)+')');renderFeed();hud();renderGoals();award();renderChart()}
+ X.feed.push((won?'🟩 ':res==='push'?'🟦 ':'🟥 ')+'Hand '+S.hands+': you '+pv+' vs dealer '+dv+' ('+(res==='bj'?'blackjack':res)+')');renderFeed();hud();renderGoals();if(S.mode==='practice')award();renderChart()}
 const X={feed:[]};function renderFeed(){$('feed').innerHTML=X.feed.slice(-6).reverse().map(f=>'<div style="padding:3px 0;border-bottom:1px solid #f0e8ff">'+f+'</div>').join('')||'No hands yet.';$('sbar').style.width=Math.min(100,S.streak*20)+'%';$('stxt').textContent=S.streak?('Win streak '+S.streak+': next win pays x'+(1+0.1*Math.min(S.streak,5)).toFixed(1)):'Win hands in a row to raise your payout bonus up to +50%.'}
 // ---------- replay of real devnet hands ----------
 const EXP='https://explorer.solana.com/tx/';const CU='?cluster=custom&customUrl=https%3A%2F%2Fdevnet-us.magicblock.app';
 S.mode='replay';S.data=null;S.ridx=0;
 const RMAP={BLACKJACK:'bj',WIN:'win',LOSE:'lose',PUSH:'push',BUST:'bust'};
 const CD=c=>({s:Math.floor(c/13),r:c%13});
-function setMode(m){X.feed=[];S.ep=(S.ep||0)+1;rbusy=false;S.mode=m;S.state='bet';S.chips=1000;S.hands=0;S.wins=0;S.streak=0;S.best=0;S.peak=1000;S.grid=[];S.hist=[1000];S.player=[];S.dealer=[];S.ridx=0;$('hist').innerHTML='';render(false);$('msg').textContent='';
+function setMode(m){X.feed=[];S.ep=(S.ep||0)+1;rbusy=false;S.mode=m;S.state='bet';S.chips=1000;S.hands=0;S.wins=0;S.streak=0;S.best=0;S.peak=1000;S.grid=[];S.hist=[1000];S.dblWin=false;S.bjAny=false;S.player=[];S.dealer=[];S.ridx=0;$('hist').innerHTML='';render(false);$('msg').textContent='';
  $('t-replay').classList.toggle('on',m==='replay');$('t-practice').classList.toggle('on',m==='practice');$('bet-ctl').style.display=m==='practice'?'':'none';$('play-ctl').style.display='none';$('replay-ctl').style.display=m==='replay'?'':'none';
  $('src').textContent=m==='replay'?'real devnet hands (VRF)':'practice: local shuffle, not VRF';say(m==='replay'?'Watch real on-chain hands!':'Place your bet and I will deal!');hud();renderChart();renderFeed()}
 $('t-replay').onclick=()=>setMode('replay');$('t-practice').onclick=()=>setMode('practice');
