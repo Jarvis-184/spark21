@@ -44,6 +44,7 @@ Rollup transactions open in the explorer with the MagicBlock devnet validator as
 - Cards come from an unlimited shoe: every draw is independent, so the same card can appear twice in a hand.
 - The account is public, so the dealer's hole card can be read on-chain by someone who looks. This is a hackathon prototype, not a gambling product.
 - The web demo's music, fireworks, levels, badges, daily spin, goals and feed are client-side and stored in localStorage. The Replay tab plays back recorded on-chain hands; it is not a live connection.
+- No timeout or refund: if the VRF callback never arrives, the table stays "pending", and once chips reach 0 there is no refill on-chain (the web Practice mode has a daily spin instead).
 - Only one wallet played the recorded run. No wash trades or fake users.
 
 ## Build and run
